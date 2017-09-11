@@ -1196,16 +1196,19 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 			goto end;
 		}
 
-	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_SUSPENDED)
+	snd_pcm_state_t const state = snd_pcm_status_get_state(status);
+
+	switch (state)
 	{
+		case SND_PCM_STATE_SUSPENDED:
 		jack_log("**** alsa_pcm: pcm in suspended state, resuming it" );
 			if ((res = snd_pcm_prepare(handle)) < 0) {
 				jack_error("error preparing after suspend: %s", snd_strerror(res));
 			}
-	}
+			break;
 
-	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_XRUN
-	    && driver->process_count > XRUN_REPORT_DELAY) {
+		case SND_PCM_STATE_XRUN:
+	if (driver->process_count >= XRUN_REPORT_DELAY) {
 		struct timeval now, diff, tstamp;
 		driver->xrun_count++;
 		snd_pcm_status_get_tstamp(status,&now);
@@ -1213,6 +1216,12 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 		timersub(&now, &tstamp, &diff);
 		*delayed_usecs = diff.tv_sec * 1000000.0 + diff.tv_usec;
 		jack_log("**** alsa_pcm: xrun of at least %.3f msecs",*delayed_usecs / 1000.0);
+	}
+			break;
+
+		default:
+			jack_error("programming error: don't know how to perform xrun recovery from snd_pcm_state_t value %d", (int) state);
+			break;
 	}
 
 end:
