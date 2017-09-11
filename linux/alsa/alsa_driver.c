@@ -1168,6 +1168,14 @@ alsa_driver_restart (alsa_driver_t *driver)
 	return res;
 }
 
+static snd_pcm_t*
+alsa_driver_get_any_handle (alsa_driver_t *driver)
+{
+	return driver->capture_handle
+		? driver->capture_handle
+		: driver->playback_handle;
+}
+
 static int
 alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 {
@@ -1176,32 +1184,24 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 
 	snd_pcm_status_alloca(&status);
 
-	if (driver->capture_handle) {
-		if ((res = snd_pcm_status(driver->capture_handle, status))
-		    < 0) {
-			jack_error("status error: %s", snd_strerror(res));
-		}
-	} else {
-		if ((res = snd_pcm_status(driver->playback_handle, status))
-		    < 0) {
-			jack_error("status error: %s", snd_strerror(res));
-		}
+	snd_pcm_t* const handle = alsa_driver_get_any_handle(driver);
+
+	if (!handle) {
+		jack_error("should not happen: driver has neither playback nor capture handle");
+		goto end;
 	}
+
+		if ((res = snd_pcm_status(handle, status)) < 0) {
+			jack_error("status error: %s", snd_strerror(res));
+			goto end;
+		}
 
 	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_SUSPENDED)
 	{
 		jack_log("**** alsa_pcm: pcm in suspended state, resuming it" );
-		if (driver->capture_handle) {
-			if ((res = snd_pcm_prepare(driver->capture_handle))
-			    < 0) {
+			if ((res = snd_pcm_prepare(handle)) < 0) {
 				jack_error("error preparing after suspend: %s", snd_strerror(res));
 			}
-		} else {
-			if ((res = snd_pcm_prepare(driver->playback_handle))
-			    < 0) {
-				jack_error("error preparing after suspend: %s", snd_strerror(res));
-			}
-		}
 	}
 
 	if (snd_pcm_status_get_state(status) == SND_PCM_STATE_XRUN
@@ -1214,6 +1214,8 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 		*delayed_usecs = diff.tv_sec * 1000000.0 + diff.tv_usec;
 		jack_log("**** alsa_pcm: xrun of at least %.3f msecs",*delayed_usecs / 1000.0);
 	}
+
+end:
 
 	if (alsa_driver_restart (driver)) {
 		return -1;
