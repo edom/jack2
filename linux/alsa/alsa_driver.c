@@ -1248,6 +1248,17 @@ alsa_driver_set_clock_sync_status (alsa_driver_t *driver, channel_t chn,
 	alsa_driver_clock_sync_notify (driver, chn, status);
 }
 
+static int
+alsa_driver_poll (alsa_driver_t *driver, unsigned int nfds)
+{
+	// This ifdef was introduced in commit 4a94e129.
+#ifdef __ANDROID__
+	return poll (driver->pfd, nfds, -1);  //fix for sleep issue
+#else
+	return poll (driver->pfd, nfds, driver->poll_timeout);
+#endif
+}
+
 static int under_gdb = FALSE;
 
 jack_nframes_t
@@ -1326,11 +1337,8 @@ alsa_driver_wait (alsa_driver_t *driver, int extra_fd, int *status, float
 			driver->poll_late++;
 		}
 
-#ifdef __ANDROID__
-		poll_result = poll (driver->pfd, nfds, -1);  //fix for sleep issue
-#else
-		poll_result = poll (driver->pfd, nfds, driver->poll_timeout);
-#endif
+		poll_result = alsa_driver_poll (driver, nfds);
+
 		if (poll_result < 0) {
 
 			if (errno == EINTR) {
