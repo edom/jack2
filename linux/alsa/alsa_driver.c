@@ -1192,7 +1192,7 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 	}
 
 		if ((res = snd_pcm_status(handle, status)) < 0) {
-			jack_error("status error: %s", snd_strerror(res));
+			jack_error("snd_pcm_status error: %s", snd_strerror(res));
 			goto end;
 		}
 
