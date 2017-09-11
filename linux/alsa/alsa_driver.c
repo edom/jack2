@@ -1191,32 +1191,32 @@ alsa_driver_xrun_recovery (alsa_driver_t *driver, float *delayed_usecs)
 		goto end;
 	}
 
-		if ((res = snd_pcm_status(handle, status)) < 0) {
-			jack_error("snd_pcm_status error: %s", snd_strerror(res));
-			goto end;
-		}
+	if ((res = snd_pcm_status(handle, status)) < 0) {
+		jack_error("snd_pcm_status error: %s", snd_strerror(res));
+		goto end;
+	}
 
 	snd_pcm_state_t const state = snd_pcm_status_get_state(status);
 
 	switch (state)
 	{
 		case SND_PCM_STATE_SUSPENDED:
-		jack_log("**** alsa_pcm: pcm in suspended state, resuming it" );
+			jack_log("**** alsa_pcm: pcm in suspended state, resuming it" );
 			if ((res = snd_pcm_prepare(handle)) < 0) {
 				jack_error("error preparing after suspend: %s", snd_strerror(res));
 			}
 			break;
 
 		case SND_PCM_STATE_XRUN:
-	if (driver->process_count >= XRUN_REPORT_DELAY) {
-		struct timeval now, diff, tstamp;
-		driver->xrun_count++;
-		snd_pcm_status_get_tstamp(status,&now);
-		snd_pcm_status_get_trigger_tstamp(status, &tstamp);
-		timersub(&now, &tstamp, &diff);
-		*delayed_usecs = diff.tv_sec * 1000000.0 + diff.tv_usec;
-		jack_log("**** alsa_pcm: xrun of at least %.3f msecs",*delayed_usecs / 1000.0);
-	}
+			if (driver->process_count >= XRUN_REPORT_DELAY) {
+				struct timeval now, diff, tstamp;
+				driver->xrun_count++;
+				snd_pcm_status_get_tstamp(status,&now);
+				snd_pcm_status_get_trigger_tstamp(status, &tstamp);
+				timersub(&now, &tstamp, &diff);
+				*delayed_usecs = diff.tv_sec * 1000000.0 + diff.tv_usec;
+				jack_log("**** alsa_pcm: xrun of at least %.3f msecs",*delayed_usecs / 1000.0);
+			}
 			break;
 
 		default:
